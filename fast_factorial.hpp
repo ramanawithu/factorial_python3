@@ -12,9 +12,9 @@
 #include <iostream>
 #include <iterator>
 
-/* Implementation of factorial in asymptotically optimum way. It can be solved by expressing the factorial
-   function products of prime powers. However, integer prime factorization isn't easy job. There are efficient
-   algorithm to evaluate factorial. Refer
+/* Implementation of factorial in the Python3 way. Factorial is asymptotic by expressing the factorial result
+   as products of prime powers. However, integer prime factorization isn't easy job. There are efficient
+   algorithm to evaluate factorial. Refer the following link author website for details of such algorithms,
    
    http://www.luschny.de/math/factorial/binarysplitfact.html
    
@@ -24,12 +24,12 @@
    
    ++++++++++++Divide-Conquer Multiplication Algorithm++++++++++++
 
-   We use polynomial representation of integral numbers in large base, preferbly power of 2. Considering a 64-bit
-   system with base of 2 ^ 31, where 31 is exponent (scale). The number can be expressed as,
+   We use polynomial representation of integral numbers in large base, preferbly power of 2. We are considering
+   64-bit system with base of 2 ^ 31, where 31 is exponent (scale). The number can be expressed as,
 
    N = An * 2^(scale*n) + An-1 * 2^(scale*(n-1)) + ... + A0 * 2^(scale*0)
    
-   i.e. scale is the representation weight and A0 ... An are co-efficients.
+   i.e. 'scale' is representation weight and A0 ... An are co-efficients.
 
    These co-efficients can be stored in a collection. In our implementation, we store A0 at 0-index.
 
@@ -37,7 +37,7 @@
    the weight in terms of (2^scale*index). We represent the least significant digit of number in 0 location
    followed by higher co-efficients on higher side of collection.
    
-   We have used vector as our collection.
+   We have used vector as our collection data structure.
 
    The beauty in using exact power of 2 simplifies multiplication as left shift. I didn't consider all 32
    bits of uint32_t to ignore carry (borrow) during intermediate addition (subtraction). We can use all 32 bits
@@ -47,6 +47,7 @@
    Infact, BINARY_BASE can anything below 32. The algorithms used holds good.
    
    ++++++++++++Competetive Programming Case++++++++++++
+
    Most of the CP cases require truncating N! with a remainder operation over largest prime. The current idea
    is adopted from Python3 implementation, can be tweaked for CP needs.
 */
@@ -54,22 +55,21 @@
 namespace math {
 
 #if defined (__x86_64__)
-    const static int32_t RECURSIVE_MUL_THRESHOLD = 120;
-
-    // Base - 2**31, leaving one bit for carry manipulation during addition & subtraction
-    const static uint32_t BINARY_SHIFT  = 31;
-    const static uint32_t BINARY_BASE   = uint32_t(1) << BINARY_SHIFT;
-    const static uint32_t BINARY_MASK   = BINARY_BASE - 1;
-
-    const static uint32_t DECIMAL_SHIFT = 9;
-    const static uint32_t DECIMAL_BASE  = 1000 * 1000 * 1000;
-
-    /* word_t is set to uint32_t to hold maximum of 2^31-1 as co-efficient value.
+    /* word_t is alias of uint32_t to hold maximum of 2^31-1 as co-efficient value.
      * dword_t is used during multiplication of two word_t data.
      */
     typedef uint32_t  word_t;
     typedef uint64_t dword_t;
 
+    const static int32_t RECURSIVE_MUL_THRESHOLD = 120; // A trial & error limit, varies across platfroms.
+
+    // Base - 2**31, leaving one bit for carry manipulation during positional addition & subtraction
+    const static uint32_t BINARY_SHIFT  = 31;
+    const static uint32_t BINARY_BASE   = word_t(1) << BINARY_SHIFT;
+    const static uint32_t BINARY_MASK   = BINARY_BASE - 1;
+
+    const static uint32_t DECIMAL_SHIFT = 9;
+    const static uint32_t DECIMAL_BASE  = 1000 * 1000 * 1000;
 #else
     #error "Undefined word_t on 32 bit or lower size platforms"
 #endif
@@ -77,7 +77,7 @@ namespace math {
 /* C++ vector along with move semantics are used to hold co-efficients. */
 typedef std::vector<word_t> value_container_t;
 
-/* Odd products of N! to be multiplied with 2^pexp, where 'pexp' is exponent of 2 in prime
+/* Products of odd numbers in N! to be multiplied with 2^pexp, where 'pexp' is exponent of 2 in prime
    factors of N! Interestingly the following relation holds between population count (# set bits) and N.
    Using GCC intrinisics to found set bits at the expense of one instruction.
 */
@@ -87,12 +87,14 @@ int32_t two_exponent(uint32_t n) {
 }
 
 /* A helper function to drop zero valued higher co-efficient(s) after every intermediate result. */
+inline
 void drop_leading_zeros(value_container_t &val) {
     while (!val.empty() && 0 == val.back())
         val.pop_back();
 }
 
 /* Splits input co-efficient vector into two parts @shift. */
+inline
 void split(const value_container_t &v, uint32_t shift, value_container_t &vh, value_container_t &vl) {
     const auto split_at = std::min<uint32_t>(shift, v.size());
     std::copy(v.begin(), v.begin()+split_at, std::back_inserter(vl));
@@ -427,6 +429,8 @@ private:
     /* Convert binary representation of BigInt to decimal base with weight of DECIMAL_BASE.
      * We can represent inplace value_ in DECIMAL_BASE. To support const BigInt, returning modified container.
      * We are not utilizing full bandwidth of uint32_t in decimal form for simplicity.
+     *
+     * Algorithm - Usual grade school methond of converting one base to another base.
     */
     value_container_t convert_to_decimal(void) const {
         int dsize = 1 + int(value_.size() * BINARY_SHIFT / (3 * DECIMAL_SHIFT));
@@ -475,8 +479,8 @@ private:
 
 }; // Class definition
 
-/* Generates partial product of all odd numbers in between [N ... N/2)
- * Forms a tree structure of evaluation, for e.g. N = 31, the recursion tree
+/* Generates product of all odd numbers in the range [A ... B], where A <= B + 1.
+ * Forms a tree structure of evaluation, for e.g. B = 31 and A = 17, the recursion tree
  *
  *                         P(17, 31)
  *                     /     m=23      \
@@ -485,9 +489,13 @@ private:
  *      P(17, 19)   P(21, 23)   P(25, 27)   P(29, 31)
  *       (17*19)     (21*23)     (25*27)     (29*31)
  *
+ * i.e. we get product of 31,29,27,...19,17 as result.
+ *
+ * NOTE: The type of l and u should fit in word_t and their product should fit in dword_t.
+ *       Since (l, u) <= N in N!, uint32_t is sufficient enough.
 */
 
-BigInt partial_product(uint64_t l, uint64_t u) {
+BigInt partial_product(uint32_t l, uint32_t u) {
     if (u <= (l + 1))
         return BigInt(uint64_t(l));
 
@@ -496,7 +504,7 @@ BigInt partial_product(uint64_t l, uint64_t u) {
 
     // Find mid (left) odd element - we are spliting the range here.
     const static uint32_t no_branching[] = {1, 0};
-    uint64_t m = l + (u - l)/2;
+    uint64_t m = l + ((u - l) >> 1);
     m = m - no_branching[m & 1];
     auto a = partial_product(l, m);
     auto b = partial_product(m+2, u);
@@ -508,7 +516,7 @@ BigInt partial_product(uint64_t l, uint64_t u) {
    top most call - product of odd numbers in the range [N ... N/2)
    next call - product of odd numbers in the range [N/2 ... N/4)
    ... so on
-   Until N/2 < 3
+   Until N > 3
 */
 void odd_product_in_range(int n, BigInt &odds_product, BigInt &result) {
     if (n <= 2)
@@ -544,3 +552,4 @@ BigInt Factorial(int32_t n) {
 } // math namespace
 
 #endif // FAST_FACTORIAL_HPP
+
